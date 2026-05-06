@@ -1,0 +1,9 @@
+{
+  "id": "mac-tts",
+  "name": "Mac TTS (say)",
+  "version": "2.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Speak and save notes using the built-in macOS say command. Supports high-quality macOS voices like Ava, Samantha, Daniel etc. No external server required.",
+  "author": "noniboy",
+  "isDesktopOnly": true
+}
