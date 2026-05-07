@@ -78,40 +78,31 @@ class MacTTSPlugin extends obsidian.Plugin {
         this.isPaused = false;
     }
 
+    getEditor() {
+        const view = this.app.workspace.getActiveViewOfType(obsidian.MarkdownView);
+        return view ? view.editor : null;
+    }
+
     async onload() {
         await this.loadSettings();
         this.addSettingTab(new MacTTSSettingTab(this.app, this));
 
-        this.addRibbonIcon('volume-2', 'Speak note / selection', () => this.speakSelection());
-        this.addRibbonIcon('whole-word', 'Speak selected text only', () => {
-            const view = this.app.workspace.getActiveViewOfType(obsidian.MarkdownView);
-            if (view && view.editor) {
-                const sel = view.editor.getSelection();
-                if (sel && sel.trim()) this.speak(sel);
-                else new obsidian.Notice('No text selected');
-            }
-        });
+        this.addRibbonIcon('volume-2', 'Speak note', () => this.speakSelection());
         this.addRibbonIcon('circle-pause', 'Pause / Resume', () => this.togglePause());
         this.addRibbonIcon('square', 'Stop', () => this.stopPlayback());
         this.addRibbonIcon('download', 'Save as MP3', () => {
-            const view = this.app.workspace.getActiveViewOfType(obsidian.MarkdownView);
-            if (view && view.editor) this.saveAudio(view.editor.getValue());
-        });
-
-        this.addCommand({
-            id: 'speak-selection',
-            name: 'Speak selected text',
-            editorCallback: (editor) => {
-                const sel = editor.getSelection();
-                if (sel && sel.trim()) this.speak(sel);
-                else new obsidian.Notice('No text selected');
-            }
+            const editor = this.getEditor();
+            if (editor) this.saveAudio(editor.getValue());
         });
 
         this.addCommand({
             id: 'speak-note',
             name: 'Speak entire note',
-            editorCallback: (editor) => this.speakQueued(editor.getValue())
+            callback: () => {
+                const editor = this.getEditor();
+                if (!editor) { new obsidian.Notice('No note open'); return; }
+                this.speakQueued(editor.getValue());
+            }
         });
 
         this.addCommand({
@@ -129,16 +120,10 @@ class MacTTSPlugin extends obsidian.Plugin {
         this.addCommand({
             id: 'save-audio',
             name: 'Save note as MP3',
-            editorCallback: (editor) => this.saveAudio(editor.getValue())
-        });
-
-        this.addCommand({
-            id: 'save-selection-audio',
-            name: 'Save selected text as MP3',
-            editorCallback: (editor) => {
-                const sel = editor.getSelection();
-                if (sel && sel.trim()) this.saveAudio(sel);
-                else new obsidian.Notice('No text selected');
+            callback: () => {
+                const editor = this.getEditor();
+                if (!editor) { new obsidian.Notice('No note open'); return; }
+                this.saveAudio(editor.getValue());
             }
         });
     }
@@ -177,22 +162,17 @@ class MacTTSPlugin extends obsidian.Plugin {
         if (this.currentProcess) {
             this.currentProcess.kill('SIGKILL');
             this.currentProcess = null;
+            new obsidian.Notice('Stopped');
         }
-        new obsidian.Notice('Stopped');
     }
 
     speak(text) {
-        if (!text || !text.trim()) {
-            new obsidian.Notice('No text to speak');
-            return;
-        }
+        if (!text || !text.trim()) { new obsidian.Notice('No text to speak'); return; }
         this.stopPlayback();
         this.isPlaying = true;
         this.isPaused = false;
-
         const proc = child_process.spawn('say', this.getSayArgs(text));
         this.currentProcess = proc;
-
         proc.on('close', () => { this.currentProcess = null; this.isPlaying = false; });
         proc.on('error', (e) => { new obsidian.Notice('TTS Error: ' + e.message); this.isPlaying = false; });
     }
@@ -202,15 +182,12 @@ class MacTTSPlugin extends obsidian.Plugin {
         this.stopPlayback();
         this.isPlaying = true;
         this.isPaused = false;
-
         const paragraphs = text.split(/\n\s*\n/).map(p => p.trim()).filter(p => p.length > 0);
         new obsidian.Notice('Speaking ' + paragraphs.length + ' paragraph(s)...');
-
         for (let i = 0; i < paragraphs.length; i++) {
             if (!this.isPlaying) break;
             await this.speakAndWait(paragraphs[i]);
         }
-
         if (this.isPlaying) { this.isPlaying = false; new obsidian.Notice('Playback complete'); }
     }
 
@@ -226,18 +203,14 @@ class MacTTSPlugin extends obsidian.Plugin {
 
     saveAudio(text) {
         if (!text || !text.trim()) { new obsidian.Notice('No text to save'); return; }
-
         const activeFile = this.app.workspace.getActiveFile();
         const baseName = activeFile ? activeFile.basename : 'tts-output';
         const downloadsPath = path.join(os.homedir(), 'Downloads');
         const aiffPath = path.join(downloadsPath, baseName + '.aiff');
         const mp3Path = path.join(downloadsPath, baseName + '.mp3');
-
         new obsidian.Notice('Saving audio to Downloads...');
-
         const args = ['-v', this.settings.voice, '-r', String(this.settings.rate), '-o', aiffPath, text.trim()];
         const proc = child_process.spawn('say', args);
-
         proc.on('close', (code) => {
             if (code !== 0) { new obsidian.Notice('Save failed: say command error'); return; }
             const convert = child_process.spawn('afconvert', ['-f', 'mp4f', '-d', 'aac', aiffPath, mp3Path]);
@@ -248,17 +221,12 @@ class MacTTSPlugin extends obsidian.Plugin {
             });
             convert.on('error', () => new obsidian.Notice('Saved to Downloads: ' + baseName + '.aiff'));
         });
-
         proc.on('error', (e) => new obsidian.Notice('Save failed: ' + e.message));
     }
 
     speakSelection() {
-        const view = this.app.workspace.getActiveViewOfType(obsidian.MarkdownView);
-        if (view && view.editor) {
-            const sel = view.editor.getSelection();
-            if (sel && sel.trim()) this.speak(sel);
-            else this.speakQueued(view.editor.getValue());
-        }
+        const editor = this.getEditor();
+        if (editor) this.speakQueued(editor.getValue());
     }
 
     onunload() { this.stopPlayback(); }
