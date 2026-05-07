@@ -8,7 +8,7 @@ No internet • No API keys • No extra software required.
 
 ## Features
 
-- Speak entire note or just selected text
+- Speak entire note 
 - Pause / Resume playback
 - Instant stop
 - Save as **MP3** to Downloads folder
@@ -34,8 +34,7 @@ Repo: `katnino/obsidian-mac-tts`
 
 | Icon | Action |
 |------|--------|
-| 🔊   | Speak note/selection |
-| 💬   | Speak selected text only |
+| 🔊   | Speak note |
 | ⏸    | Pause / Resume |
 | ⏹    | Stop |
 | ⬇    | Save as MP3 |
