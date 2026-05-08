@@ -1,4 +1,4 @@
-# Local Mac TTS
+# Local Mac TTS for Obsidian
 
 Listen to your Obsidian notes using the **high-quality built-in macOS `say` engine**.
 
